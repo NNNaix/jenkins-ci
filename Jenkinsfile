@@ -1,64 +1,76 @@
 pipeline {
-    agent {
-        node {
-            label 'deploy'
-        }
-    }
+    agent any
+
     options{
         timeout(time: 50, unit: 'MINUTES')
     }
+
+    environment {
+        SVC_NAME = "cbim-dataservice-frontend"
+        REPO_NAME = "$SVC_NAME"
+        BRANCH = "${params.BRANCH}"
+        REPO_DIR = "/Users/naix/work/cbim-dataservice-frontend"
+        RELEASE_DIR = "/data/autodeploy/releases/$SVC_NAME/$BRANCH"
+        OLD_VERSION_FILE = "$RELEASE_DIR/latest/version.txt"
+        NEW_VERSION_FILE = "$RELEASE_DIR/version.txt"
+    }
     stages {
-        stage('build $SVC_NAME') {
+        stage('build cbim-dataservice-frontend') {
             steps {
-                sh '''source ~/.bash_profile
-                      cd $REPO_DIR
-                      git checkout master && git pull
-                      git checkout $BRANCH || (git fetch && git checkout -b $BRANCH "origin/"$BRANCH)
-                      git reset --hard
-                      git pull origin $BRANCH
-                      if [ -d "$RELEASE_DIR/latest" ] ;then \
-                         current_build_time=`date +%y-%m-%d_%H:%M:%S` && \
-                         current_branch=$BRANCH && \
-                         current_commit_id=`git log | head -3 | grep commit | awk '{print $2}'` && \
-                         last_build_time=`cat $OLD_VERSION_FILE | grep current_build_time | awk '{print $2}'` && \
-                         last_commit_id=`cat $OLD_VERSION_FILE | grep current_commit_id | awk '{print $2}'` && \
-                         last_version=`cat $OLD_VERSION_FILE | grep current_version | awk '{print $2}'` && \
-                         last_branch=`cat $OLD_VERSION_FILE | grep current_branch | awk '{print $2}'` && \
-                         num=`git log | grep -n "$last_commit_id" | awk -F ":" '{print $1}'` && \
-                         echo -e "current_build_time:" $current_build_time "\ncurrent_version:" $BUILD_NUMBER "\ncurrent_branch:" $current_branch "\ncurrent_commit_id: " $current_commit_id "\n\nlast_build_time:" $last_build_time "\nlast_version:" $last_version "\nlast_branch:" $last_branch "\nlast_commit_id:" $last_commit_id "\n\ngit-log between these two versions:\n------------------------------------" > $NEW_VERSION_FILE && \
-                         git log | head -$(($num+5)) >> $NEW_VERSION_FILE ; \
-                      else \
-                         mkdir -p $RELEASE_DIR
-                         current_build_time=`date +%y-%m-%d_%H:%M:%S` && \
-                         current_branch=$BRANCH && \
-                         current_commit_id=`git log | head -3 | grep commit | awk '{print $2}'` && \
-                         echo -e "current_build_time:" $current_build_time "\ncurrent_version:" $BUILD_NUMBER "\ncurrent_branch:" $current_branch "\ncurrent_commit_id: " $current_commit_id "\n" > $NEW_VERSION_FILE ; \
-                      fi
-                      cd $REPO_DIR
-                      git checkout $BRANCH
-                      git reset --hard
-                      git pull origin $BRANCH
-                      npm install
-                      docker run --rm -v /data/autodeploy/grafana:/go/ -i cloudwiz/grafana /go/src/github.com/wangy1931/grafana/release.sh
-                   '''
+                sh '''
+                    cd $REPO_DIR
+                    pwd
+                    npm -v
+                    npm run build
+                '''
+//                 sh '''source ~/.bash_profile
+//                       cd $REPO_DIR
+//                       git checkout master && git pull
+//                       git checkout $BRANCH || (git fetch && git checkout -b $BRANCH "origin/"$BRANCH)
+//                       git reset --hard
+//                       git pull origin $BRANCH
+//                       if [ -d "$RELEASE_DIR/latest" ] ;then \
+//                          current_build_time=`date +%y-%m-%d_%H:%M:%S` && \
+//                          current_branch=$BRANCH && \
+//                          current_commit_id=`git log | head -3 | grep commit | awk '{print $2}'` && \
+//                          last_build_time=`cat $OLD_VERSION_FILE | grep current_build_time | awk '{print $2}'` && \
+//                          last_commit_id=`cat $OLD_VERSION_FILE | grep current_commit_id | awk '{print $2}'` && \
+//                          last_version=`cat $OLD_VERSION_FILE | grep current_version | awk '{print $2}'` && \
+//                          last_branch=`cat $OLD_VERSION_FILE | grep current_branch | awk '{print $2}'` && \
+//                          num=`git log | grep -n "$last_commit_id" | awk -F ":" '{print $1}'` && \
+//                          echo -e "current_build_time:" $current_build_time "\ncurrent_version:" $BUILD_NUMBER "\ncurrent_branch:" $current_branch "\ncurrent_commit_id: " $current_commit_id "\n\nlast_build_time:" $last_build_time "\nlast_version:" $last_version "\nlast_branch:" $last_branch "\nlast_commit_id:" $last_commit_id "\n\ngit-log between these two versions:\n------------------------------------" > $NEW_VERSION_FILE && \
+//                          git log | head -$(($num+5)) >> $NEW_VERSION_FILE ; \
+//                       else \
+//                          mkdir -p $RELEASE_DIR
+//                          current_build_time=`date +%y-%m-%d_%H:%M:%S` && \
+//                          current_branch=$BRANCH && \
+//                          current_commit_id=`git log | head -3 | grep commit | awk '{print $2}'` && \
+//                          echo -e "current_build_time:" $current_build_time "\ncurrent_version:" $BUILD_NUMBER "\ncurrent_branch:" $current_branch "\ncurrent_commit_id: " $current_commit_id "\n" > $NEW_VERSION_FILE ; \
+//                       fi
+//                       cd $REPO_DIR
+//                       git checkout $BRANCH
+//                       git reset --hard
+//                       git pull origin $BRANCH
+//                       npm install
+//                    '''
             }
         }
-        stage('release file') {
-            steps {
-                sh '''TAR_VERSION=`cd $REPO_DIR && head -12 package.json | grep "version" | awk -F "\\"" '{print $4}'`
-                      RELEASE_FILE=$REPO_NAME-$TAR_VERSION.tar.gz
-                      mkdir -p $RELEASE_DIR/$BUILD_NUMBER
-                      mv $NEW_VERSION_FILE $RELEASE_DIR/$BUILD_NUMBER
-                      mv $REPO_DIR/dist/$RELEASE_FILE $RELEASE_DIR/$BUILD_NUMBER ; \
-                      if [ -L $RELEASE_DIR/latest ] ;then \
-                         unlink $RELEASE_DIR/latest && \
-                         ln -s $RELEASE_DIR/$BUILD_NUMBER $RELEASE_DIR/latest ; \
-                      else \
-                         ln -s $RELEASE_DIR/$BUILD_NUMBER $RELEASE_DIR/latest ; \
-                      fi
-                  '''
-            }
-        }
+//         stage('release file') {
+//             steps {
+//                 sh '''TAR_VERSION=`cd $REPO_DIR && head -12 package.json | grep "version" | awk -F "\\"" '{print $4}'`
+//                       RELEASE_FILE=$REPO_NAME-$TAR_VERSION.tar.gz
+//                       mkdir -p $RELEASE_DIR/$BUILD_NUMBER
+//                       mv $NEW_VERSION_FILE $RELEASE_DIR/$BUILD_NUMBER
+//                       mv $REPO_DIR/dist/$RELEASE_FILE $RELEASE_DIR/$BUILD_NUMBER ; \
+//                       if [ -L $RELEASE_DIR/latest ] ;then \
+//                          unlink $RELEASE_DIR/latest && \
+//                          ln -s $RELEASE_DIR/$BUILD_NUMBER $RELEASE_DIR/latest ; \
+//                       else \
+//                          ln -s $RELEASE_DIR/$BUILD_NUMBER $RELEASE_DIR/latest ; \
+//                       fi
+//                   '''
+//             }
+//         }
         stage('note to html') {
             steps {
                 script{
@@ -121,18 +133,5 @@ pipeline {
                 }
             }
         }
-    }
-
-    environment {
-        SVC_NAME = "cloudwiz-web"
-        REPO_NAME = "$SVC_NAME"
-        BRANCH = "$selected_branch"
-        REPO_DIR = "/data/autodeploy/grafana/src/github.com/wangy1931/grafana"
-        RELEASE_DIR = "/data/autodeploy/releases/$SVC_NAME/$BRANCH"
-        OLD_VERSION_FILE = "$RELEASE_DIR/latest/version.txt"
-        NEW_VERSION_FILE = "$RELEASE_DIR/version.txt"
-
-        GOPATH = '/data/autodeploy/grafana/src/github.com/wangy1931/grafana:/data/autodeploy/grafana'
-        WEBFRONT_SPACE = '/data/autodeploy/grafana/src/github.com/wangy1931/grafana'
     }
 } 
